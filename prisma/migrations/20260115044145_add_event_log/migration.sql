@@ -1,9 +1,0 @@
--- CreateTable
-CREATE TABLE "EventLog" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "type" TEXT NOT NULL,
-    "playerId" INTEGER,
-    "source" TEXT NOT NULL DEFAULT 'SYSTEM',
-    "payload" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
