@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Team {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique  // مثال: "2007", "2008", "First Team"
+  createdAt DateTime @default(now())
+
+  players   Player[]
+  users     User[]
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  players   Player[]
+}
+
+model Position {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  players   PlayerPosition[]
+}
+
+model Player {
+  id          Int      @id @default(autoincrement())
+  name        String
+  fullName    String
+
+  // ✅ Normalized fields for case-insensitive search
+  nameNorm     String   @default("")
+  fullNameNorm String   @default("")
+
+  // (قديم) ممكن تسيبه للـ legacy
+  position    String
+  shirtNumber Int
+  birthYear   Int
+
+  photoUrl    String?   // صورة اللاعب (URL أو /uploads/...)
+
+  // ✅ Soft delete flag
+  isActive    Boolean   @default(true)
+
+  createdAt   DateTime  @default(now())
+
+  // ✅ Team relation
+  teamId      Int?
+  team        Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  // ✅ Category relation
+  categoryId  Int?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  // ✅ Stats relation
+  stats       PlayerStats?
+
+  // ✅ Positions relation
+  positions   PlayerPosition[]
+
+  // ✅ Media relation (Contracts removed)
+  media       Media[]
+
+  // ✅ منع تكرار رقم التيشيرت داخل نفس الفريق
+  @@unique([teamId, shirtNumber])
+
+  // ✅ منع تكرار نفس اللاعب داخل نفس الفريق (بالاسم normalized + سنة الميلاد)
+  @@unique([teamId, fullNameNorm, birthYear])
+}
+
+model PlayerStats {
+  id        Int    @id @default(autoincrement())
+  matches   Int    @default(0)
+  goals     Int    @default(0)
+  assists   Int    @default(0)
+  rating    Float  @default(0)
+
+  source    String @default("manual") // manual | auto
+
+  playerId  Int    @unique
+  player    Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model PlayerPosition {
+  id         Int      @id @default(autoincrement())
+  playerId   Int
+  positionId Int
+  isPrimary  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  // ✅ هنا التعديل
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Restrict)
+
+  @@unique([playerId, positionId])
+}
+model Media {
+  id        Int      @id @default(autoincrement())
+  playerId  Int
+  type      String   @default("image") // image | video | doc ...
+  url       String
+  title     String?
+  createdAt DateTime @default(now())
+
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  role      String   @default("USER") // ADMIN | COACH | USER
+  photoUrl  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  teamId    Int?
+  team      Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+}
+
+model EventLog {
+  id        Int      @id @default(autoincrement())
+  type      String
+  playerId  Int?
+  source    String   @default("SYSTEM")
+  payload   String?
+  createdAt DateTime @default(now())
+}
