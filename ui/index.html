@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PENTA | منصة إدارة اللاعبين</title>
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#111a2e;
+      --muted:#90a4c3;
+      --text:#e8f0ff;
+      --line:#1e2a45;
+      --good:#2dd4bf;
+      --bad:#fb7185;
+      --warn:#fbbf24;
+      --btn:#2563eb;
+    }
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    body{margin:0;background:linear-gradient(180deg,#070b14, #0b1220);color:var(--text)}
+    header{
+      position:sticky;top:0;z-index:10;
+      backdrop-filter: blur(10px);
+      background:rgba(11,18,32,.75);
+      border-bottom:1px solid var(--line);
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+    .brand{display:flex;gap:10px;align-items:center}
+    .logo{
+      width:34px;height:34px;border-radius:10px;
+      background:linear-gradient(135deg,#2563eb,#22c55e);
+      box-shadow:0 8px 30px rgba(37,99,235,.25);
+    }
+    .title{font-weight:800;letter-spacing:.5px}
+    .sub{color:var(--muted);font-size:13px;margin-top:2px}
+    .card{
+      background:rgba(17,26,46,.85);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      box-shadow:0 14px 50px rgba(0,0,0,.25);
+    }
+    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    .btn{
+      background:var(--btn);border:0;color:white;
+      padding:10px 12px;border-radius:12px;
+      cursor:pointer;font-weight:700;
+    }
+    .btn.secondary{background:#1f2a44}
+    .btn.danger{background:#ef4444}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    input,select{
+      width:100%;padding:10px 12px;border-radius:12px;
+      border:1px solid var(--line);background:#0b1220;color:var(--text);
+      outline:none;
+    }
+    label{font-size:13px;color:var(--muted)}
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    @media (max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+    .kpi h2{margin:0;font-size:18px}
+    .kpi p{margin:6px 0 0;color:var(--muted);font-size:12px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--line);text-align:right;font-size:14px}
+    th{color:var(--muted);font-weight:700}
+    tr:hover{background:rgba(255,255,255,.03)}
+    .pill{
+      display:inline-flex;gap:6px;align-items:center;
+      padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+      font-size:12px;color:var(--muted)
+    }
+    .dot{width:8px;height:8px;border-radius:50%}
+    .dot.ok{background:var(--good)}
+    .dot.bad{background:var(--bad)}
+    .dot.warn{background:var(--warn)}
+    .muted{color:var(--muted)}
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    @media (max-width:650px){.split{grid-template-columns:1fr}}
+    .h{margin:0 0 8px;font-size:16px}
+    .small{font-size:12px;color:var(--muted)}
+    .msg{margin-top:10px;font-size:13px}
+    .msg.ok{color:var(--good)}
+    .msg.bad{color:var(--bad)}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="row">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <div class="title">PENTA — المنصة الأولى (عرض + إدارة)</div>
+          <div class="sub">Velocity | Football Operating System</div>
+        </div>
+      </div>
+
+      <div class="row" style="gap:10px">
+        <span id="tokenState" class="pill"><span class="dot bad"></span> Token: غير مسجل</span>
+        <button class="btn secondary" onclick="openLogin()">Login</button>
+        <button class="btn" onclick="refreshAll()">Refresh</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" style="padding-top:18px">
+  <div class="grid">
+
+    <!-- LEFT: Players -->
+    <section class="card">
+      <div class="row" style="align-items:flex-end">
+        <div>
+          <h3 class="h">Players</h3>
+          <div class="small">عرض كل اللاعبين + البحث</div>
+        </div>
+        <div style="width:260px">
+          <label>بحث بالاسم</label>
+          <input id="q" placeholder="مثال: Salah / Test" oninput="renderPlayers()" />
+        </div>
+      </div>
+
+      <div style="margin-top:12px" class="kpis">
+        <div class="card kpi">
+          <h2 id="k_total">—</h2><p>عدد اللاعبين</p>
+        </div>
+        <div class="card kpi">
+          <h2 id="k_withStats">—</h2><p>عندهم Stats</p>
+        </div>
+        <div class="card kpi">
+          <h2 id="k_best">—</h2><p>أعلى Rating</p>
+        </div>
+        <div class="card kpi">
+          <h2 id="k_last">—</h2><p>آخر لاعب اتضاف</p>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;overflow:auto">
+        <table>
+          <thead>
+          <tr>
+            <th>ID</th>
+            <th>الاسم</th>
+            <th>المركز</th>
+            <th>رقم</th>
+            <th>Rating</th>
+            <th></th>
+          </tr>
+          </thead>
+          <tbody id="playersTbody"></tbody>
+        </table>
+      </div>
+
+      <div id="playersMsg" class="msg"></div>
+    </section>
+
+    <!-- RIGHT: Player Profile -->
+    <aside class="card">
+      <h3 class="h">Player Profile</h3>
+      <div class="small">اختر لاعب من الجدول عشان تشوف ملفه</div>
+
+      <div style="margin-top:12px" class="card">
+        <div class="row">
+          <div class="pill"><span class="dot ok"></span> Core API</div>
+          <div class="pill"><span class="dot ok"></span> EventLog Ready</div>
+        </div>
+        <div class="small" style="margin-top:8px">
+          المنصة الأولى دي هي “مصدر الحقيقة” لباقي المنصات.
+        </div>
+      </div>
+
+      <div id="profileBox" style="margin-top:12px" class="card">
+        <div class="muted">لم يتم اختيار لاعب بعد.</div>
+      </div>
+
+      <div style="margin-top:12px" class="card">
+        <h3 class="h" style="margin-bottom:6px">Update Stats (Admin)</h3>
+        <div class="small">يحتاج Token + Role ADMIN</div>
+
+        <div class="split" style="margin-top:10px">
+          <div>
+            <label>Matches</label>
+            <input id="s_matches" type="number" value="0" />
+          </div>
+          <div>
+            <label>Goals</label>
+            <input id="s_goals" type="number" value="0" />
+          </div>
+          <div>
+            <label>Assists</label>
+            <input id="s_assists" type="number" value="0" />
+          </div>
+          <div>
+            <label>Rating</label>
+            <input id="s_rating" type="number" step="0.1" value="0" />
+          </div>
+        </div>
+
+        <div style="margin-top:10px">
+          <label>Source</label>
+          <select id="s_source">
+            <option value="manual">manual</option>
+            <option value="auto">auto</option>
+          </select>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <button class="btn" id="btnUpdate" onclick="updateStats()">Update</button>
+          <span class="small" id="selHint">اختر لاعب أولاً</span>
+        </div>
+
+        <div id="statsMsg" class="msg"></div>
+      </div>
+
+    </aside>
+
+  </div>
+</main>
+
+<!-- LOGIN MODAL -->
+<div id="loginModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);z-index:50">
+  <div class="wrap" style="height:100%;display:flex;align-items:center;justify-content:center">
+    <div class="card" style="width:min(520px,100%);">
+      <div class="row">
+        <h3 class="h" style="margin:0">Login</h3>
+        <button class="btn secondary" onclick="closeLogin()">إغلاق</button>
+      </div>
+      <div class="small">هنا هنجيب Token من /auth/login ونحفظه في المتصفح.</div>
+
+      <div class="split" style="margin-top:12px">
+        <div>
+          <label>Email</label>
+          <input id="l_email" value="admin@penta.com" />
+        </div>
+        <div>
+          <label>Password</label>
+          <input id="l_pass" type="password" value="123456" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button class="btn" onclick="doLogin()">Login</button>
+        <button class="btn danger" onclick="logout()">Logout</button>
+      </div>
+
+      <div id="loginMsg" class="msg"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = "http://localhost:3000";
+  let playersCache = [];
+  let selectedPlayerId = null;
+
+  function getToken(){
+    return localStorage.getItem("PENTA_TOKEN") || "";
+  }
+  function setToken(t){
+    if(t) localStorage.setItem("PENTA_TOKEN", t);
+    else localStorage.removeItem("PENTA_TOKEN");
+    updateTokenUI();
+  }
+  function updateTokenUI(){
+    const el = document.getElementById("tokenState");
+    const dot = el.querySelector(".dot");
+    const ok = !!getToken();
+    dot.className = "dot " + (ok ? "ok" : "bad");
+    el.innerHTML = `<span class="dot ${ok ? "ok" : "bad"}"></span> Token: ${ok ? "مسجل" : "غير مسجل"}`;
+  }
+
+  async function apiGet(path){
+    const res = await fetch(API + path, {
+      headers: getToken() ? { "Authorization": "Bearer " + getToken() } : {}
+    });
+    return res.json();
+  }
+  async function apiSend(path, method, body){
+    const headers = { "Content-Type": "application/json" };
+    if(getToken()) headers["Authorization"] = "Bearer " + getToken();
+
+    const res = await fetch(API + path, {
+      method,
+      headers,
+      body: JSON.stringify(body)
+    });
+    return res.json();
+  }
+
+  function openLogin(){ document.getElementById("loginModal").style.display="block"; }
+  function closeLogin(){ document.getElementById("loginModal").style.display="none"; }
+
+  async function doLogin(){
+    const email = document.getElementById("l_email").value.trim();
+    const password = document.getElementById("l_pass").value.trim();
+    const msg = document.getElementById("loginMsg");
+    msg.className="msg"; msg.textContent="... جاري تسجيل الدخول";
+
+    try{
+      const out = await apiSend("/auth/login","POST",{email,password});
+      if(out.token){
+        setToken(out.token);
+        msg.className="msg ok";
+        msg.textContent="✅ Login successful — Token saved";
+        closeLogin();
+      }else{
+        msg.className="msg bad";
+        msg.textContent = "❌ " + (out.message || "Login failed");
+      }
+    }catch(e){
+      msg.className="msg bad";
+      msg.textContent="❌ Error: " + e.message;
+    }
+  }
+
+  function logout(){
+    setToken("");
+    const msg = document.getElementById("loginMsg");
+    msg.className="msg ok";
+    msg.textContent="✅ Logged out";
+  }
+
+  async function refreshAll(){
+    await loadPlayers();
+    if(selectedPlayerId) await loadProfile(selectedPlayerId);
+  }
+
+  async function loadPlayers(){
+    const msg = document.getElementById("playersMsg");
+    msg.className="msg"; msg.textContent="... loading players";
+    const out = await apiGet("/players");
+    if(out.success){
+      playersCache = out.data || [];
+      msg.className="msg ok";
+      msg.textContent = `✅ Loaded ${playersCache.length} players`;
+      calcKpis(playersCache);
+      renderPlayers();
+    }else{
+      msg.className="msg bad";
+      msg.textContent = "❌ " + (out.message || "Cannot load players");
+    }
+  }
+
+  function calcKpis(list){
+    document.getElementById("k_total").textContent = list.length;
+
+    const withStats = list.filter(p => p.stats).length;
+    document.getElementById("k_withStats").textContent = withStats;
+
+    let best = null;
+    for(const p of list){
+      if(p.stats && (best==null || p.stats.rating > best.stats.rating)) best = p;
+    }
+    document.getElementById("k_best").textContent = best ? best.stats.rating : "—";
+
+    const last = [...list].sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt))[0];
+    document.getElementById("k_last").textContent = last ? last.id : "—";
+  }
+
+  function renderPlayers(){
+    const q = document.getElementById("q").value.trim().toLowerCase();
+    const rows = playersCache
+      .filter(p => !q || (p.name||"").toLowerCase().includes(q) || (p.fullName||"").toLowerCase().includes(q))
+      .map(p => {
+        const rating = p.stats ? p.stats.rating : "-";
+        return `
+          <tr>
+            <td>${p.id}</td>
+            <td>
+              <div style="font-weight:800">${escapeHtml(p.name)}</div>
+              <div class="small">${escapeHtml(p.fullName || "")}</div>
+            </td>
+            <td>${escapeHtml(p.position || "")}</td>
+            <td>${p.shirtNumber ?? ""}</td>
+            <td>${rating}</td>
+            <td><button class="btn secondary" onclick="selectPlayer(${p.id})">Open</button></td>
+          </tr>
+        `;
+      }).join("");
+
+    document.getElementById("playersTbody").innerHTML = rows || `<tr><td colspan="6" class="muted">لا يوجد نتائج.</td></tr>`;
+  }
+
+  async function selectPlayer(id){
+    selectedPlayerId = id;
+    document.getElementById("selHint").textContent = "Player #" + id;
+    await loadProfile(id);
+  }
+
+  async function loadProfile(id){
+    const box = document.getElementById("profileBox");
+    box.innerHTML = `<div class="muted">... loading profile</div>`;
+    const out = await apiGet(`/players/${id}`);
+    if(!out.success){
+      box.innerHTML = `<div class="msg bad">❌ ${out.message || "Player not found"}</div>`;
+      return;
+    }
+    const p = out.data;
+
+    // fill stats form
+    document.getElementById("s_matches").value = p.stats?.matches ?? 0;
+    document.getElementById("s_goals").value = p.stats?.goals ?? 0;
+    document.getElementById("s_assists").value = p.stats?.assists ?? 0;
+    document.getElementById("s_rating").value = p.stats?.rating ?? 0;
+    document.getElementById("s_source").value = p.stats?.source ?? "manual";
+
+    box.innerHTML = `
+      <div class="row" style="align-items:flex-start">
+        <div>
+          <div style="font-size:18px;font-weight:900">${escapeHtml(p.fullName)}</div>
+          <div class="small">#${p.shirtNumber} • ${escapeHtml(p.position)} • ${p.birthYear}</div>
+          <div class="small">CreatedAt: ${new Date(p.createdAt).toLocaleString()}</div>
+        </div>
+        <span class="pill"><span class="dot ok"></span> Player ID: ${p.id}</span>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="row">
+          <div class="pill"><span class="dot warn"></span> Stats</div>
+          <div class="small">${p.stats ? "متوفر" : "غير موجود"}</div>
+        </div>
+        <div style="margin-top:10px" class="split">
+          <div class="pill"><b>Matches</b> <span class="muted">${p.stats?.matches ?? 0}</span></div>
+          <div class="pill"><b>Goals</b> <span class="muted">${p.stats?.goals ?? 0}</span></div>
+          <div class="pill"><b>Assists</b> <span class="muted">${p.stats?.assists ?? 0}</span></div>
+          <div class="pill"><b>Rating</b> <span class="muted">${p.stats?.rating ?? 0}</span></div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function updateStats(){
+    const msg = document.getElementById("statsMsg");
+    msg.className="msg"; msg.textContent="... updating";
+    if(!selectedPlayerId){
+      msg.className="msg bad"; msg.textContent="❌ اختر لاعب أولاً";
+      return;
+    }
+    if(!getToken()){
+      msg.className="msg bad"; msg.textContent="❌ لازم تعمل Login الأول";
+      return;
+    }
+
+    const body = {
+      matches: Number(document.getElementById("s_matches").value || 0),
+      goals: Number(document.getElementById("s_goals").value || 0),
+      assists: Number(document.getElementById("s_assists").value || 0),
+      rating: Number(document.getElementById("s_rating").value || 0),
+      source: document.getElementById("s_source").value || "manual",
+    };
+
+    try{
+      const out = await apiSend(`/players/${selectedPlayerId}/stats`, "PUT", body);
+      if(out.success){
+        msg.className="msg ok";
+        msg.textContent="✅ Stats updated";
+        await refreshAll();
+      }else{
+        msg.className="msg bad";
+        msg.textContent="❌ " + (out.message || "Update failed");
+      }
+    }catch(e){
+      msg.className="msg bad";
+      msg.textContent="❌ Error: " + e.message;
+    }
+  }
+
+  function escapeHtml(s){
+    return String(s ?? "").replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[m]));
+  }
+
+  // init
+  updateTokenUI();
+  loadPlayers();
+</script>
+</body>
+</html>

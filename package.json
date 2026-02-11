@@ -1,0 +1,53 @@
+{
+  "name": "penta",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "npm run stop:3000:node && nodemon index.js",
+    "start": "node index.js",
+    "start:prod": "npm run stop:3000:node && npx cross-env NODE_ENV=production node index.js",
+
+    "test:prep": "npx cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db node tools/test-reset-db.js",
+
+    "test": "npx cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db npm run test:prep && npx cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db jest",
+    "test:watch": "npx cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db npm run test:prep && npx cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db jest --watchAll",
+
+    "stop:3000:node": "node tools/kill-port-3000-node.js",
+
+    "db:reset:dev": "npx cross-env DATABASE_URL=file:./prisma/dev.db prisma migrate reset --force --skip-generate",
+    "db:reset:test": "npx cross-env DATABASE_URL=file:./prisma/test.db prisma migrate reset --force --skip-generate",
+    "db:migrate:prod": "npx cross-env DATABASE_URL=file:./prisma/prod.db prisma migrate deploy",
+    "db:seed:prod": "npx cross-env NODE_ENV=production node prisma/seed.js",
+
+    "prisma:seed": "node prisma/seed.js",
+    "prisma:studio": "npx prisma studio",
+    "prisma:migrate": "npx prisma migrate dev"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "joi": "^18.0.2",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.0.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.11",
+    "prisma": "^5.22.0",
+    "supertest": "^7.2.2"
+  }
+}

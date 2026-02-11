@@ -1,0 +1,16 @@
+// src/index.js
+const app = require("./app");
+const { PORT, NODE_ENV, CORS_ORIGINS } = require("./config/env");
+
+app.listen(PORT, () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`📄 Swagger Docs on http://localhost:${PORT}/api-docs`);
+  console.log(`🧾 Swagger JSON on http://localhost:${PORT}/api-docs.json`);
+  console.log(`🖼️ Uploads served on http://localhost:${PORT}/uploads`);
+  console.log(`❤️ Health check on http://localhost:${PORT}/health`);
+  console.log(
+    `🔒 env=${NODE_ENV} | prodCorsOrigins=${
+      Array.isArray(CORS_ORIGINS) ? CORS_ORIGINS.length : 0
+    }`
+  );
+});

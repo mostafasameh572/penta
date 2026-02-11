@@ -1,0 +1,18 @@
+const { PrismaClient } = require("@prisma/client");
+
+const prisma = new PrismaClient();
+
+async function main() {
+  const players = await prisma.player.findMany({
+    include: { stats: true }
+  });
+  console.log(players);
+}
+
+main()
+  .catch((err) => {
+    console.error("ERROR:", err);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
