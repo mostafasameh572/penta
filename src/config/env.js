@@ -54,17 +54,23 @@ module.exports = {
   // ✅ JWT secret:
   // - في production لازم
   // - في dev اختياري (عشان التطوير ما يتعطلش)
-  JWT_SECRET: isProd ? must("JWT_SECRET") : String(optional("JWT_SECRET", "dev_secret")),
+  JWT_SECRET: isProd
+    ? must("JWT_SECRET")
+    : String(optional("JWT_SECRET", "dev_secret")),
+
+  // ✅ DB URLs (اختياري - مفيد للـ prod/CI)
+  DATABASE_URL: optional("DATABASE_URL"),
+  DATABASE_URL_TEST: optional("DATABASE_URL_TEST"),
+  DATABASE_URL_PROD: optional("DATABASE_URL_PROD"),
 
   // ✅ CORS allowlist (production)
   // مثال: CORS_ORIGINS=http://localhost:5173,https://yourdomain.com
   CORS_ORIGINS: csv("CORS_ORIGINS", ""),
 
   // ✅ Rate limit (requests per window)
-  RATE_LIMIT_MAX: posNum("RATE_LIMIT_MAX", 600), // أنسب لمشروع كبير
+  RATE_LIMIT_MAX: posNum("RATE_LIMIT_MAX", 600),
 
   // ✅ window for rate limit (ms)
-  // تقدر تتحكم فيها بـ RATE_LIMIT_WINDOW_MS أو RATE_LIMIT_WINDOW_SEC
   RATE_LIMIT_WINDOW_MS,
 
   // ✅ Login limiter (production) (requests per window)
