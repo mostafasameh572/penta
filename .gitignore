@@ -1,16 +1,19 @@
-node_modules
+# deps
+node_modules/
+
+# env files
 .env
 .env.*
-!.env.example
 
-# Prisma generated
+# prisma generated
 /generated/prisma
+node_modules/.prisma/
 
-# Prisma DB files
-prisma/*.db
-prisma/*.db-journal
-prisma/*.db-wal
-prisma/*.db-shm
+# sqlite/prisma db artifacts anywhere
+**/*.db
+**/*.db-journal
+**/*.db-wal
+**/*.db-shm
 
-# Uploads
+# uploads
 uploads/
