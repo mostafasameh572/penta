@@ -11,10 +11,9 @@
   "scripts": {
     "dev": "npm run stop:3000:node && nodemon index.js",
     "start": "node index.js",
-
     "start:prod": "npm run stop:3000:node && cross-env NODE_ENV=production node index.js",
 
-    "test:prep": "cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db node tools/test-reset-db.js",
+    "test:prep": "cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db prisma migrate reset --force --skip-generate",
     "test": "npm run test:prep && cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db jest",
     "test:watch": "npm run test:prep && cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db jest --watchAll",
 
@@ -25,18 +24,17 @@
 
     "db:migrate:prod": "cross-env NODE_ENV=production prisma migrate deploy",
     "db:seed:prod": "cross-env NODE_ENV=production node prisma/seed.js",
-    "prod:sqlite:deploy": "cross-env NODE_ENV=production DATABASE_URL=file:./prisma/prod.db prisma migrate deploy",
 
-    "prisma:seed": "node prisma/seed.js",
-    "prisma:studio": "prisma studio",
+    "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:generate": "prisma generate"
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "node prisma/seed.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "5.22.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
@@ -55,7 +53,7 @@
     "cross-env": "^7.0.3",
     "jest": "^30.2.0",
     "nodemon": "^3.1.11",
-    "prisma": "^5.22.0",
+    "prisma": "5.22.0",
     "supertest": "^7.2.2"
   }
 }
