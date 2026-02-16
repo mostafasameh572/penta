@@ -13,21 +13,21 @@
     "start": "node index.js",
     "start:prod": "npm run stop:3000:node && cross-env NODE_ENV=production node index.js",
 
-    "test:prep": "cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db prisma migrate reset --force --skip-generate",
+    "test:prep": "cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db npx prisma migrate reset --force --skip-generate",
     "test": "npm run test:prep && cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db jest",
     "test:watch": "npm run test:prep && cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db jest --watchAll",
 
     "stop:3000:node": "node tools/kill-port-3000-node.js",
 
-    "db:reset:dev": "cross-env DATABASE_URL=file:./prisma/dev.db prisma migrate reset --force --skip-generate",
-    "db:reset:test": "cross-env DATABASE_URL=file:./prisma/test.db prisma migrate reset --force --skip-generate",
+    "db:reset:dev": "cross-env DATABASE_URL=file:./prisma/dev.db npx prisma migrate reset --force --skip-generate",
+    "db:reset:test": "cross-env DATABASE_URL=file:./prisma/test.db npx prisma migrate reset --force --skip-generate",
 
-    "db:migrate:prod": "cross-env NODE_ENV=production prisma migrate deploy",
+    "db:migrate:prod": "cross-env NODE_ENV=production npx prisma migrate deploy",
     "db:seed:prod": "cross-env NODE_ENV=production node prisma/seed.js",
 
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
+    "prisma:generate": "npx prisma generate",
+    "prisma:migrate": "npx prisma migrate dev",
+    "prisma:studio": "npx prisma studio",
     "prisma:seed": "node prisma/seed.js"
   },
   "prisma": {
