@@ -17,3 +17,7 @@ node_modules/.prisma/
 
 # uploads
 uploads/
+# accidental output files
+tatus
+*.log
+*.tmp
