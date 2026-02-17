@@ -13,22 +13,23 @@
     "start": "node index.js",
     "start:prod": "npm run stop:3000:node && cross-env NODE_ENV=production node index.js",
 
-    "test:prep": "cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db npx prisma migrate reset --force --skip-generate",
-    "test": "npm run test:prep && cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db jest",
-    "test:watch": "npm run test:prep && cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db jest --watchAll",
+    "prisma:clean": "node -e \"require('fs').rmSync('node_modules/.prisma',{recursive:true,force:true})\"",
+    "prisma:generate": "npm run prisma:clean && prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "node prisma/seed.js",
 
-    "stop:3000:node": "node tools/kill-port-3000-node.js",
+    "test:prep": "cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db prisma migrate reset --force --skip-generate",
+    "test": "npm run prisma:generate && npm run test:prep && cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db jest",
+    "test:watch": "npm run prisma:generate && npm run test:prep && cross-env NODE_ENV=test DEBUG_AUTH=0 DATABASE_URL=file:./prisma/test.db jest --watchAll",
 
-    "db:reset:dev": "cross-env DATABASE_URL=file:./prisma/dev.db npx prisma migrate reset --force --skip-generate",
-    "db:reset:test": "cross-env DATABASE_URL=file:./prisma/test.db npx prisma migrate reset --force --skip-generate",
+    "db:reset:dev": "cross-env DATABASE_URL=file:./prisma/dev.db prisma migrate reset --force --skip-generate",
+    "db:reset:test": "cross-env DATABASE_URL=file:./prisma/test.db prisma migrate reset --force --skip-generate",
 
-    "db:migrate:prod": "cross-env NODE_ENV=production npx prisma migrate deploy",
+    "db:migrate:prod": "cross-env NODE_ENV=production prisma migrate deploy",
     "db:seed:prod": "cross-env NODE_ENV=production node prisma/seed.js",
 
-    "prisma:generate": "npx prisma generate",
-    "prisma:migrate": "npx prisma migrate dev",
-    "prisma:studio": "npx prisma studio",
-    "prisma:seed": "node prisma/seed.js"
+    "stop:3000:node": "node tools/kill-port-3000-node.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
