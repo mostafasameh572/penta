@@ -8,7 +8,6 @@ module.exports = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
-    // ✅ Debug log (لو DEBUG_AUTH=1)
     if (debugAuth) {
       console.log(
         `[AUTH] ${req.method} ${req.originalUrl} | header: ${authHeader ? "YES" : "NO"}`
@@ -31,20 +30,23 @@ module.exports = (req, res, next) => {
     }
 
     const token = parts[1];
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: isDev ? "Invalid token format" : "Unauthorized",
-      });
-    }
-
+if (!token) {
+  return res.status(401).json({
+    success: false,
+    message: isDev ? "Invalid token format" : "Unauthorized",
+  });
+}
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     req.user = {
       id: decoded.id,
       role: decoded.role,
+      clubId: decoded.clubId ?? null,
       teamId: decoded.teamId ?? null,
     };
+
+    // ❌ شيلنا شرط منع الدخول بدون clubId
+    // دلوقتي النظام backward-compatible مع التستات
 
     if (req.user.role === "COACH" && !req.user.teamId) {
       return res.status(403).json({

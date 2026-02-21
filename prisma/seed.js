@@ -8,22 +8,43 @@ function norm(v) {
   return String(v || "").trim().toLowerCase();
 }
 
-async function upsertTeam(name) {
+// ============ Club ============
+async function upsertClub(name) {
+  return prisma.club.upsert({
+    where: { name },
+    update: {},
+    create: { name },
+  });
+}
+
+// ============ Team / Category (now unique inside club) ============
+async function upsertTeam({ clubId, name }) {
   return prisma.team.upsert({
-    where: { name },
+    where: {
+      clubId_name: {
+        clubId,
+        name,
+      },
+    },
     update: {},
-    create: { name },
+    create: { name, clubId },
   });
 }
 
-async function upsertCategory(name) {
+async function upsertCategory({ clubId, name }) {
   return prisma.category.upsert({
-    where: { name },
+    where: {
+      clubId_name: {
+        clubId,
+        name,
+      },
+    },
     update: {},
-    create: { name },
+    create: { name, clubId },
   });
 }
 
+// ============ Position (global) ============
 async function upsertPosition(name) {
   return prisma.position.upsert({
     where: { name },
@@ -32,7 +53,8 @@ async function upsertPosition(name) {
   });
 }
 
-async function upsertUser({ email, password, role, teamId }) {
+// ============ Users ============
+async function upsertUser({ email, password, role, teamId, clubId }) {
   const hash = await bcrypt.hash(password, 10);
   return prisma.user.upsert({
     where: { email },
@@ -40,6 +62,7 @@ async function upsertUser({ email, password, role, teamId }) {
       password: hash,
       role,
       teamId: teamId ?? null,
+      clubId: clubId ?? null,
       isActive: true,
     },
     create: {
@@ -47,12 +70,15 @@ async function upsertUser({ email, password, role, teamId }) {
       password: hash,
       role,
       teamId: teamId ?? null,
+      clubId: clubId ?? null,
       isActive: true,
     },
   });
 }
 
+// ============ Players ============
 async function upsertPlayer({
+  clubId,
   teamId,
   categoryId,
   name,
@@ -63,6 +89,7 @@ async function upsertPlayer({
   photoUrl,
 }) {
   const dataCommon = {
+    clubId: clubId ?? null,
     name,
     fullName,
     nameNorm: norm(name),
@@ -76,11 +103,12 @@ async function upsertPlayer({
     isActive: true,
   };
 
-  // ✅ CASE 1: teamId is NOT null => safe to use compound unique upsert
+  // ✅ CASE 1: teamId موجود => نستخدم compound unique الجديد
   if (teamId !== null && teamId !== undefined) {
     return prisma.player.upsert({
       where: {
-        teamId_fullNameNorm_birthYear: {
+        clubId_teamId_fullNameNorm_birthYear: {
+          clubId: Number(clubId),
           teamId: Number(teamId),
           fullNameNorm: norm(fullName),
           birthYear: Number(birthYear),
@@ -91,9 +119,10 @@ async function upsertPlayer({
     });
   }
 
-  // ✅ CASE 2: teamId is null => cannot use that compound unique in upsert.where
+  // ✅ CASE 2: teamId = null => نعمل findFirst داخل نفس النادي
   const existing = await prisma.player.findFirst({
     where: {
+      clubId: Number(clubId),
       teamId: null,
       fullNameNorm: norm(fullName),
       birthYear: Number(birthYear),
@@ -111,6 +140,7 @@ async function upsertPlayer({
   return prisma.player.create({ data: dataCommon });
 }
 
+// ============ Stats ============
 async function upsertStats(playerId, stats) {
   return prisma.playerStats.upsert({
     where: { playerId },
@@ -132,6 +162,7 @@ async function upsertStats(playerId, stats) {
   });
 }
 
+// ============ PlayerPosition ============
 async function upsertPlayerPosition(playerId, positionId, isPrimary = false) {
   const link = await prisma.playerPosition.upsert({
     where: {
@@ -160,6 +191,7 @@ async function upsertPlayerPosition(playerId, positionId, isPrimary = false) {
   return link;
 }
 
+// ============ Media ============
 async function createMediaIfNotExists({ playerId, type, url, title }) {
   const existing = await prisma.media.findFirst({
     where: { playerId, type, url, title: title ?? null },
@@ -177,27 +209,31 @@ async function createMediaIfNotExists({ playerId, type, url, title }) {
 }
 
 async function main() {
-  // 1) Teams
-  const team2007 = await upsertTeam("2007");
-  const team2008 = await upsertTeam("2008");
+  // 0) Club (Tenant)
+  const club = await upsertClub("Penta Demo Club");
 
-  // 2) Categories
-  const catU16 = await upsertCategory("U16");
-  const catU17 = await upsertCategory("U17");
+  // 1) Teams (inside club)
+  const team2007 = await upsertTeam({ clubId: club.id, name: "2007" });
+  const team2008 = await upsertTeam({ clubId: club.id, name: "2008" });
 
-  // 3) Positions
+  // 2) Categories (inside club)
+  const catU16 = await upsertCategory({ clubId: club.id, name: "U16" });
+  const catU17 = await upsertCategory({ clubId: club.id, name: "U17" });
+
+  // 3) Positions (global)
   const posGK = await upsertPosition("GK");
   const posCB = await upsertPosition("CB");
   const posCM = await upsertPosition("CM");
   const posST = await upsertPosition("ST");
   const posRW = await upsertPosition("RW");
 
-  // 4) Users
+  // 4) Users (inside club)
   const admin = await upsertUser({
     email: "admin@penta.com",
     password: "123456",
     role: "ADMIN",
     teamId: null,
+    clubId: club.id,
   });
 
   const coach2007 = await upsertUser({
@@ -205,10 +241,12 @@ async function main() {
     password: "123456",
     role: "COACH",
     teamId: team2007.id,
+    clubId: club.id,
   });
 
-  // 5) Players
+  // 5) Players (inside club)
   const p1 = await upsertPlayer({
+    clubId: club.id,
     teamId: team2007.id,
     categoryId: catU16.id,
     name: "Ali",
@@ -220,6 +258,7 @@ async function main() {
   });
 
   const p2 = await upsertPlayer({
+    clubId: club.id,
     teamId: team2008.id,
     categoryId: catU17.id,
     name: "Kareem",
@@ -230,8 +269,9 @@ async function main() {
     photoUrl: null,
   });
 
-  // ✅ player without team (teamId = null) — now safe
+  // ✅ player بدون فريق (Free agent) لكن داخل نفس النادي
   const p3 = await upsertPlayer({
+    clubId: club.id,
     teamId: null,
     categoryId: null,
     name: "Test",
@@ -262,6 +302,7 @@ async function main() {
   });
 
   console.log("✅ Seed ready:", {
+    club: club.name,
     teams: [team2007.name, team2008.name],
     categories: [catU16.name, catU17.name],
     positions: ["GK", "CB", "CM", "ST", "RW"],

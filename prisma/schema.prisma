@@ -7,21 +7,47 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Team {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique  // مثال: "2007", "2008", "First Team"
-  createdAt DateTime @default(now())
-
-  players   Player[]
-  users     User[]
-}
-
-model Category {
+model Club {
   id        Int      @id @default(autoincrement())
   name      String   @unique
   createdAt DateTime @default(now())
 
+  teams      Team[]
+  users      User[]
+  players    Player[]
+  categories Category[]
+  eventLogs  EventLog[]
+}
+
+model Team {
+  id        Int      @id @default(autoincrement())
+  name      String   // مثال: "2007", "2008", "First Team"
+  createdAt DateTime @default(now())
+
+  // ✅ Multi-club
+  clubId    Int?
+  club      Club?    @relation(fields: [clubId], references: [id], onDelete: SetNull)
+
   players   Player[]
+  users     User[]
+
+  // ✅ الاسم يبقى unique داخل النادي (مش على مستوى السيستم كله)
+  @@unique([clubId, name])
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now())
+
+  // ✅ Multi-club
+  clubId    Int?
+  club      Club?    @relation(fields: [clubId], references: [id], onDelete: SetNull)
+
+  players   Player[]
+
+  // ✅ الاسم يبقى unique داخل النادي
+  @@unique([clubId, name])
 }
 
 model Position {
@@ -41,40 +67,37 @@ model Player {
   nameNorm     String   @default("")
   fullNameNorm String   @default("")
 
-  // (قديم) ممكن تسيبه للـ legacy
+  // (قديم) legacy
   position    String
   shirtNumber Int
   birthYear   Int
 
-  photoUrl    String?   // صورة اللاعب (URL أو /uploads/...)
+  photoUrl    String?
+  isActive    Boolean  @default(true)
 
-  // ✅ Soft delete flag
-  isActive    Boolean   @default(true)
+  createdAt   DateTime @default(now())
 
-  createdAt   DateTime  @default(now())
+  // ✅ Multi-club
+  clubId      Int?
+  club        Club?    @relation(fields: [clubId], references: [id], onDelete: SetNull)
 
   // ✅ Team relation
   teamId      Int?
-  team        Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  team        Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   // ✅ Category relation
   categoryId  Int?
   category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  // ✅ Stats relation
   stats       PlayerStats?
-
-  // ✅ Positions relation
   positions   PlayerPosition[]
-
-  // ✅ Media relation (Contracts removed)
   media       Media[]
 
-  // ✅ منع تكرار رقم التيشيرت داخل نفس الفريق
-  @@unique([teamId, shirtNumber])
+  // ✅ منع تكرار رقم التيشيرت داخل نفس الفريق + النادي
+  @@unique([clubId, teamId, shirtNumber])
 
-  // ✅ منع تكرار نفس اللاعب داخل نفس الفريق (بالاسم normalized + سنة الميلاد)
-  @@unique([teamId, fullNameNorm, birthYear])
+  // ✅ منع تكرار نفس اللاعب داخل نفس الفريق + النادي
+  @@unique([clubId, teamId, fullNameNorm, birthYear])
 }
 
 model PlayerStats {
@@ -98,12 +121,11 @@ model PlayerPosition {
   createdAt  DateTime @default(now())
 
   player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
-
-  // ✅ هنا التعديل
   position   Position @relation(fields: [positionId], references: [id], onDelete: Restrict)
 
   @@unique([playerId, positionId])
 }
+
 model Media {
   id        Int      @id @default(autoincrement())
   playerId  Int
@@ -124,6 +146,10 @@ model User {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
+  // ✅ Multi-club
+  clubId    Int?
+  club      Club?    @relation(fields: [clubId], references: [id], onDelete: SetNull)
+
   teamId    Int?
   team      Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
 }
@@ -135,4 +161,8 @@ model EventLog {
   source    String   @default("SYSTEM")
   payload   String?
   createdAt DateTime @default(now())
+
+  // ✅ Multi-club
+  clubId    Int?
+  club      Club?    @relation(fields: [clubId], references: [id], onDelete: SetNull)
 }
