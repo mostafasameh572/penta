@@ -91,6 +91,7 @@ app.get("/api-docs.json", (req, res) => {
 
 // ================= middleware =================
 const authMiddleware = require("./middleware/auth.middleware");
+const singleTenant = require("./middleware/singleTenant.middleware");
 const { applyApiLimiter, applyLoginLimiter } = require("./middleware/rateLimiters");
 
 // ================= routes =================
@@ -124,15 +125,18 @@ app.use("/dashboard", dashboardRoutes);
 app.use("/upload", uploadRoutes);
 app.use("/events", eventRoutes);
 
-app.use("/teams", authMiddleware, teamRoutes);
-app.use("/players", authMiddleware, playerRoutes);
-app.use("/players", authMiddleware, playerProfileRoutes);
+// ✅ Protected routes (Auth + Single-tenant club injection)
+app.use("/teams", authMiddleware, singleTenant, teamRoutes);
 
-app.use("/categories", authMiddleware, categoryRoutes);
-app.use("/media", authMiddleware, mediaRoutes);
-app.use("/positions", authMiddleware, positionRoutes);
-app.use("/player-positions", authMiddleware, playerPositionRoutes);
-app.use("/player-stats", authMiddleware, playerStatsRoutes);
+app.use("/players", authMiddleware, singleTenant, playerRoutes);
+app.use("/players", authMiddleware, singleTenant, playerProfileRoutes);
+
+app.use("/categories", authMiddleware, singleTenant, categoryRoutes);
+app.use("/media", authMiddleware, singleTenant, mediaRoutes);
+app.use("/positions", authMiddleware, singleTenant, positionRoutes);
+
+app.use("/player-positions", authMiddleware, singleTenant, playerPositionRoutes);
+app.use("/player-stats", authMiddleware, singleTenant, playerStatsRoutes);
 
 // ================= error handler =================
 const errorHandler = require("./middleware/errorHandler");
@@ -182,4 +186,5 @@ process.on("uncaughtException", (err) => {
     process.exit(1);
   }
 });
+
 module.exports = app;
