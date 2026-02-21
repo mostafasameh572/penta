@@ -52,15 +52,27 @@ function uniqueKind(err) {
   return "GENERIC";
 }
 
+// ✅ Phase 2A: Club isolation (backward compatible)
+// لو token فيه clubId -> نفعل العزل
+// لو مفيش clubId (تست/توكن قديم) -> نسيبها null (بدون عزل)
+function getClubIdOrNull(req) {
+  const clubId = req.user?.clubId;
+  if (clubId === undefined || clubId === null || clubId === "") return null;
+  const n = Number(clubId);
+  return Number.isFinite(n) ? n : null;
+}
+
 /**
  * GET ALL PLAYERS
  * (Admin: all or active only)
  * (Coach: only his team + active only)
+ * + ✅ Club isolation if clubId exists
  */
 exports.getAllPlayers = async (req, res, next) => {
   try {
     const role = req.user?.role;
     const userTeamId = req.user?.teamId ?? null;
+    const clubId = getClubIdOrNull(req);
 
     // ✅ safety: Coach لازم يكون مربوط بفريق
     if (role === "COACH" && !userTeamId) {
@@ -78,7 +90,8 @@ exports.getAllPlayers = async (req, res, next) => {
     const skip = (page - 1) * take;
 
     // includeInactive works for ADMIN only
-    const includeInactive = role === "ADMIN" && String(req.query.includeInactive) === "true";
+    const includeInactive =
+      role === "ADMIN" && String(req.query.includeInactive) === "true";
 
     let teamIdFilter = null;
 
@@ -96,6 +109,11 @@ exports.getAllPlayers = async (req, res, next) => {
     }
 
     const where = {};
+
+    // ✅ Club scope (if available)
+    if (clubId) {
+      where.clubId = clubId;
+    }
 
     // ✅ Team scope
     if (teamIdFilter !== null) {
@@ -159,6 +177,7 @@ exports.getAllPlayers = async (req, res, next) => {
  * GET PLAYER BY ID
  * Admin: any
  * Coach: only if same team + active
+ * + ✅ Club isolation if clubId exists
  */
 exports.getPlayerById = async (req, res, next) => {
   try {
@@ -167,6 +186,7 @@ exports.getPlayerById = async (req, res, next) => {
 
     const role = req.user?.role;
     const coachTeamId = req.user?.teamId ?? null;
+    const clubId = getClubIdOrNull(req);
 
     // ✅ safety
     if (role === "COACH" && !coachTeamId) {
@@ -174,6 +194,9 @@ exports.getPlayerById = async (req, res, next) => {
     }
 
     const where = { id };
+
+    // ✅ Club scope
+    if (clubId) where.clubId = clubId;
 
     // ✅ Coach scope in query نفسها (أقوى)
     if (role === "COACH") {
@@ -209,17 +232,24 @@ exports.getPlayerById = async (req, res, next) => {
 
 /**
  * CREATE PLAYER (Admin)
+ * + ✅ sets clubId if available (recommended)
  */
 exports.createPlayer = async (req, res, next) => {
   try {
-    const { name, fullName, position, shirtNumber, birthYear, teamId, photoUrl } = req.body;
+    const { name, fullName, position, shirtNumber, birthYear, teamId, photoUrl } =
+      req.body;
 
     if (!name || !fullName || !position || !shirtNumber || !birthYear) {
       return error(res, "Missing required fields", 400);
     }
 
+    const clubId = getClubIdOrNull(req);
+
     const created = await prisma.player.create({
       data: {
+        // ✅ attach clubId if we have it (Phase 2A)
+        clubId: clubId ?? null,
+
         name,
         fullName,
         nameNorm: norm(name),
@@ -228,7 +258,8 @@ exports.createPlayer = async (req, res, next) => {
         position,
         shirtNumber: Number(shirtNumber),
         birthYear: Number(birthYear),
-        teamId: teamId !== undefined ? (teamId === null ? null : Number(teamId)) : null,
+        teamId:
+          teamId !== undefined ? (teamId === null ? null : Number(teamId)) : null,
         photoUrl: photoUrl ? String(photoUrl) : null,
         isActive: true,
       },
@@ -239,6 +270,7 @@ exports.createPlayer = async (req, res, next) => {
       type: "PLAYER_CREATED",
       playerId: created.id,
       source: req.user?.role || "SYSTEM",
+      // ✅ لو eventLog عندك بقى فيه clubId في service هنبعت ده بعدين
       payload: { player: created },
     });
 
@@ -246,9 +278,14 @@ exports.createPlayer = async (req, res, next) => {
   } catch (err) {
     if (isPrismaUniqueErr(err)) {
       const k = uniqueKind(err);
-      if (k === "TEAM_SHIRT") return error(res, "Shirt number already exists in this team", 409);
+      if (k === "TEAM_SHIRT")
+        return error(res, "Shirt number already exists in this team", 409);
       if (k === "TEAM_NAME_BIRTH")
-        return error(res, "Player already exists in this team (same name and birth year)", 409);
+        return error(
+          res,
+          "Player already exists in this team (same name and birth year)",
+          409
+        );
       return error(res, "Duplicate value", 409);
     }
     next(err);
@@ -257,13 +294,21 @@ exports.createPlayer = async (req, res, next) => {
 
 /**
  * UPDATE PLAYER (Admin)
+ * + ✅ Cross-club protection if clubId exists
  */
 exports.updatePlayer = async (req, res, next) => {
   try {
     const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return error(res, "Invalid player id", 400);
 
-    const exists = await prisma.player.findUnique({
-      where: { id },
+    const clubId = getClubIdOrNull(req);
+
+    // ✅ exists check (with club scope if available)
+    const exists = await prisma.player.findFirst({
+      where: {
+        id,
+        ...(clubId ? { clubId } : {}),
+      },
       select: { id: true, isActive: true },
     });
     if (!exists) return error(res, "Player not found", 404);
@@ -274,8 +319,10 @@ exports.updatePlayer = async (req, res, next) => {
 
     const data = {
       ...req.body,
-      shirtNumber: req.body.shirtNumber !== undefined ? Number(req.body.shirtNumber) : undefined,
-      birthYear: req.body.birthYear !== undefined ? Number(req.body.birthYear) : undefined,
+      shirtNumber:
+        req.body.shirtNumber !== undefined ? Number(req.body.shirtNumber) : undefined,
+      birthYear:
+        req.body.birthYear !== undefined ? Number(req.body.birthYear) : undefined,
       teamId:
         req.body.teamId !== undefined
           ? req.body.teamId === null
@@ -284,12 +331,17 @@ exports.updatePlayer = async (req, res, next) => {
           : undefined,
       photoUrl:
         req.body.photoUrl !== undefined
-          ? (req.body.photoUrl ? String(req.body.photoUrl) : null)
+          ? req.body.photoUrl
+            ? String(req.body.photoUrl)
+            : null
           : undefined,
     };
 
     if (req.body.name !== undefined) data.nameNorm = norm(req.body.name);
     if (req.body.fullName !== undefined) data.fullNameNorm = norm(req.body.fullName);
+
+    // ✅ enforce clubId stays the same (don't allow changing tenant)
+    if (data.clubId !== undefined) delete data.clubId;
 
     const updated = await prisma.player.update({
       where: { id },
@@ -308,9 +360,14 @@ exports.updatePlayer = async (req, res, next) => {
   } catch (err) {
     if (isPrismaUniqueErr(err)) {
       const k = uniqueKind(err);
-      if (k === "TEAM_SHIRT") return error(res, "Shirt number already exists in this team", 409);
+      if (k === "TEAM_SHIRT")
+        return error(res, "Shirt number already exists in this team", 409);
       if (k === "TEAM_NAME_BIRTH")
-        return error(res, "Player already exists in this team (same name and birth year)", 409);
+        return error(
+          res,
+          "Player already exists in this team (same name and birth year)",
+          409
+        );
       return error(res, "Duplicate value", 409);
     }
     next(err);
@@ -319,13 +376,20 @@ exports.updatePlayer = async (req, res, next) => {
 
 /**
  * DELETE PLAYER (Admin) ✅ Soft Delete
+ * + ✅ Cross-club protection if clubId exists
  */
 exports.deletePlayer = async (req, res, next) => {
   try {
     const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return error(res, "Invalid player id", 400);
 
-    const exists = await prisma.player.findUnique({
-      where: { id },
+    const clubId = getClubIdOrNull(req);
+
+    const exists = await prisma.player.findFirst({
+      where: {
+        id,
+        ...(clubId ? { clubId } : {}),
+      },
       select: { id: true, isActive: true },
     });
     if (!exists) return error(res, "Player not found", 404);
@@ -356,8 +420,16 @@ exports.deletePlayer = async (req, res, next) => {
 exports.deactivatePlayer = async (req, res, next) => {
   try {
     const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return error(res, "Invalid player id", 400);
 
-    const exists = await prisma.player.findUnique({ where: { id } });
+    const clubId = getClubIdOrNull(req);
+
+    const exists = await prisma.player.findFirst({
+      where: {
+        id,
+        ...(clubId ? { clubId } : {}),
+      },
+    });
     if (!exists) return error(res, "Player not found", 404);
 
     const updated = await prisma.player.update({
@@ -382,8 +454,16 @@ exports.deactivatePlayer = async (req, res, next) => {
 exports.activatePlayer = async (req, res, next) => {
   try {
     const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return error(res, "Invalid player id", 400);
 
-    const exists = await prisma.player.findUnique({ where: { id } });
+    const clubId = getClubIdOrNull(req);
+
+    const exists = await prisma.player.findFirst({
+      where: {
+        id,
+        ...(clubId ? { clubId } : {}),
+      },
+    });
     if (!exists) return error(res, "Player not found", 404);
 
     const updated = await prisma.player.update({
@@ -408,9 +488,15 @@ exports.activatePlayer = async (req, res, next) => {
 exports.updatePlayerStats = async (req, res, next) => {
   try {
     const playerId = Number(req.params.id);
+    if (!Number.isFinite(playerId)) return error(res, "Invalid player id", 400);
 
-    const exists = await prisma.player.findUnique({
-      where: { id: playerId },
+    const clubId = getClubIdOrNull(req);
+
+    const exists = await prisma.player.findFirst({
+      where: {
+        id: playerId,
+        ...(clubId ? { clubId } : {}),
+      },
       select: { id: true, isActive: true },
     });
     if (!exists) return error(res, "Player not found", 404);

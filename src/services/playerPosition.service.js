@@ -19,6 +19,12 @@ function normRole(role) {
   return String(role || "ADMIN").toUpperCase();
 }
 
+function normalizeClubId(clubId) {
+  if (clubId === undefined || clubId === null || clubId === "") return null;
+  const n = Number(clubId);
+  return Number.isFinite(n) ? n : null;
+}
+
 /**
  * ASSIGN PLAYER TO POSITION
  */
@@ -26,6 +32,24 @@ async function assignPlayerToPosition(data) {
   const playerId = toInt(data.playerId, "playerId");
   const positionId = toInt(data.positionId, "positionId");
   const isPrimary = data.isPrimary ?? false;
+  const clubId = normalizeClubId(data.clubId);
+
+  // ✅ Club isolation check
+  if (clubId) {
+    const [player, position] = await Promise.all([
+      prisma.player.findFirst({
+        where: { id: playerId, clubId },
+        select: { id: true },
+      }),
+      prisma.position.findFirst({
+        where: { id: positionId, clubId },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!player) throw httpError(404, "Player not found in this club");
+    if (!position) throw httpError(404, "Position not found in this club");
+  }
 
   const exists = await prisma.playerPosition.findFirst({
     where: { playerId, positionId },
@@ -36,7 +60,6 @@ async function assignPlayerToPosition(data) {
     throw httpError(409, "Player already assigned to this position");
   }
 
-  // لو isPrimary=true: اقفل الباقي
   if (isPrimary) {
     await prisma.playerPosition.updateMany({
       where: { playerId },
@@ -51,23 +74,29 @@ async function assignPlayerToPosition(data) {
 
 /**
  * GET ALL (ADMIN / COACH)
- * - ADMIN: all
- * - COACH: only positions for players in his team
  */
-async function getAllPlayerPositions({ role, teamId } = {}) {
+async function getAllPlayerPositions({ role, teamId, clubId } = {}) {
   const r = normRole(role);
+  const cid = normalizeClubId(clubId);
 
-  const where =
-    r === "COACH"
-      ? {
-          player: {
-            teamId: toInt(teamId, "teamId"),
-          },
-        }
-      : undefined;
+  const where = {};
+
+  if (r === "COACH") {
+    where.player = {
+      teamId: toInt(teamId, "teamId"),
+    };
+  }
+
+  // ✅ Club isolation
+  if (cid) {
+    where.player = {
+      ...(where.player || {}),
+      clubId: cid,
+    };
+  }
 
   return prisma.playerPosition.findMany({
-    where,
+    where: Object.keys(where).length ? where : undefined,
     orderBy: { id: "desc" },
     include: { position: true, player: true },
   });
@@ -76,9 +105,19 @@ async function getAllPlayerPositions({ role, teamId } = {}) {
 /**
  * SET PRIMARY POSITION
  */
-async function setPrimaryPosition(playerId, positionId) {
+async function setPrimaryPosition(playerId, positionId, clubId) {
   const pId = toInt(playerId, "playerId");
   const posId = toInt(positionId, "positionId");
+  const cid = normalizeClubId(clubId);
+
+  // ✅ Club protection
+  if (cid) {
+    const player = await prisma.player.findFirst({
+      where: { id: pId, clubId: cid },
+      select: { id: true },
+    });
+    if (!player) throw httpError(404, "Player not found in this club");
+  }
 
   const rel = await prisma.playerPosition.findUnique({
     where: {
@@ -111,14 +150,21 @@ async function setPrimaryPosition(playerId, positionId) {
 }
 
 /**
- * UNASSIGN PLAYER FROM POSITION (by playerId + positionId)
- * Production rule:
- * - لو العلاقة primary AND في علاقات تانية موجودة => 409 لازم يحدد primary جديد الأول
- * - لو primary ومافيش غيرها => عادي نحذف وتبقى primaryPosition=null
+ * UNASSIGN PLAYER FROM POSITION
  */
-async function unassignPlayerFromPosition(playerId, positionId) {
+async function unassignPlayerFromPosition(playerId, positionId, clubId) {
   const pId = toInt(playerId, "playerId");
   const posId = toInt(positionId, "positionId");
+  const cid = normalizeClubId(clubId);
+
+  // ✅ Club protection
+  if (cid) {
+    const player = await prisma.player.findFirst({
+      where: { id: pId, clubId: cid },
+      select: { id: true },
+    });
+    if (!player) throw httpError(404, "Player not found in this club");
+  }
 
   const rel = await prisma.playerPosition.findUnique({
     where: {
@@ -134,7 +180,6 @@ async function unassignPlayerFromPosition(playerId, positionId) {
     throw httpError(404, "Player is not assigned to this position");
   }
 
-  // ✅ لو primary: شوف هل في غيرها لنفس اللاعب؟
   if (rel.isPrimary) {
     const othersCount = await prisma.playerPosition.count({
       where: {

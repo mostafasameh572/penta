@@ -15,6 +15,14 @@ const { z } = require("zod");
  *     description: Categories management
  */
 
+// ============== Helpers ==============
+function getClubIdOrNull(req) {
+  const clubId = req.user?.clubId;
+  if (clubId === undefined || clubId === null || clubId === "") return null;
+  const n = Number(clubId);
+  return Number.isFinite(n) ? n : null;
+}
+
 // ============== Zod Schemas ==============
 const idParamSchema = z.object({
   params: z.object({
@@ -56,9 +64,13 @@ const updateSchema = z.object({
  */
 router.get("/", auth, async (req, res, next) => {
   try {
+    const clubId = getClubIdOrNull(req);
+
     const categories = await prisma.category.findMany({
+      where: clubId ? { clubId } : undefined, // ✅ isolate if clubId exists
       orderBy: { id: "asc" },
     });
+
     return res.json({ success: true, data: categories });
   } catch (err) {
     next(err);
@@ -90,9 +102,16 @@ router.get("/", auth, async (req, res, next) => {
  */
 router.post("/", auth, isAdmin, validate(createSchema), async (req, res, next) => {
   try {
+    const clubId = getClubIdOrNull(req);
+
     const created = await prisma.category.create({
-      data: { name: req.body.name },
+      data: {
+        name: req.body.name,
+        // ✅ attach clubId if exists (Phase 2A)
+        clubId: clubId ?? null,
+      },
     });
+
     return res.status(201).json({ success: true, data: created });
   } catch (err) {
     next(err); // ✅ let errorHandler handle Prisma errors
@@ -128,10 +147,25 @@ router.post("/", auth, isAdmin, validate(createSchema), async (req, res, next) =
  */
 router.put("/:id", auth, isAdmin, validate(updateSchema), async (req, res, next) => {
   try {
+    const clubId = getClubIdOrNull(req);
+    const id = Number(req.params.id);
+
+    // ✅ cross-club protection (only if clubId exists)
+    if (clubId) {
+      const exists = await prisma.category.findFirst({
+        where: { id, clubId },
+        select: { id: true },
+      });
+      if (!exists) {
+        return res.status(404).json({ success: false, message: "Category not found" });
+      }
+    }
+
     const updated = await prisma.category.update({
-      where: { id: req.params.id },
+      where: { id },
       data: { name: req.body.name },
     });
+
     return res.json({ success: true, data: updated });
   } catch (err) {
     next(err);
@@ -157,7 +191,22 @@ router.put("/:id", auth, isAdmin, validate(updateSchema), async (req, res, next)
  */
 router.delete("/:id", auth, isAdmin, validate(idParamSchema), async (req, res, next) => {
   try {
-    await prisma.category.delete({ where: { id: req.params.id } });
+    const clubId = getClubIdOrNull(req);
+    const id = Number(req.params.id);
+
+    // ✅ cross-club protection
+    if (clubId) {
+      const exists = await prisma.category.findFirst({
+        where: { id, clubId },
+        select: { id: true },
+      });
+      if (!exists) {
+        return res.status(404).json({ success: false, message: "Category not found" });
+      }
+    }
+
+    await prisma.category.delete({ where: { id } });
+
     return res.json({ success: true, data: { message: "Category deleted" } });
   } catch (err) {
     next(err);

@@ -17,10 +17,17 @@ const {
 
 const schemas = require("../validators/playerPosition.schema");
 
+function getClubIdOrNull(req) {
+  const clubId = req.user?.clubId;
+  if (clubId === undefined || clubId === null || clubId === "") return null;
+  const n = Number(clubId);
+  return Number.isFinite(n) ? n : null;
+}
+
 // ==============================
 // GET all (ADMIN / COACH)
-// - ADMIN: all
-// - COACH: only his team players
+// - ADMIN: all (scoped by club if clubId exists)
+// - COACH: only his team players (and scoped by club if clubId exists)
 // ==============================
 router.get(
   "/",
@@ -31,10 +38,12 @@ router.get(
     try {
       const role = req.user.role;
       const teamId = req.user.teamId ?? null;
+      const clubId = getClubIdOrNull(req);
 
       const data = await getAllPlayerPositions({
         role,
         teamId,
+        clubId,
       });
 
       return success(res, data);
@@ -54,7 +63,13 @@ router.post(
   validate(schemas.createSchema),
   async (req, res, next) => {
     try {
-      const created = await assignPlayerToPosition(req.body);
+      const clubId = getClubIdOrNull(req);
+
+      const created = await assignPlayerToPosition({
+        ...req.body,
+        clubId,
+      });
+
       return success(res, created, 201);
     } catch (err) {
       if (err?.status) return error(res, err.message, err.status);
@@ -73,8 +88,11 @@ router.put(
   validate(schemas.setPrimarySchema),
   async (req, res, next) => {
     try {
+      const clubId = getClubIdOrNull(req);
       const { playerId, positionId } = req.body;
-      const updated = await setPrimaryPosition(playerId, positionId);
+
+      const updated = await setPrimaryPosition(playerId, positionId, clubId);
+
       return success(res, updated);
     } catch (err) {
       if (err?.status) return error(res, err.message, err.status);
@@ -93,8 +111,11 @@ router.delete(
   validate(schemas.unassignSchema),
   async (req, res, next) => {
     try {
+      const clubId = getClubIdOrNull(req);
       const { playerId, positionId } = req.body;
-      const result = await unassignPlayerFromPosition(playerId, positionId);
+
+      const result = await unassignPlayerFromPosition(playerId, positionId, clubId);
+
       return success(res, result);
     } catch (err) {
       if (err?.status) return error(res, err.message, err.status);

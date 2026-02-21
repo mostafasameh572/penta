@@ -13,22 +13,15 @@ const { getBestPlayerByPosition } = require("../services/position.service");
 
 const schemas = require("../validators/position.schema");
 
-/**
- * @openapi
- * tags:
- *   - name: Positions
- *     description: Positions management + insights
- */
+function getClubIdOrNull(req) {
+  const clubId = req.user?.clubId;
+  if (clubId === undefined || clubId === null || clubId === "") return null;
+  const n = Number(clubId);
+  return Number.isFinite(n) ? n : null;
+}
 
 /**
- * @openapi
- * /positions:
- *   get:
- *     tags: [Positions]
- *     summary: Get all positions (Admin/Coach)
- *     security: [{ bearerAuth: [] }]
- *     responses:
- *       200: { description: OK }
+ * GET ALL POSITIONS
  */
 router.get(
   "/",
@@ -37,7 +30,13 @@ router.get(
   validate(schemas.listSchema),
   async (req, res, next) => {
     try {
-      const items = await prisma.position.findMany({ orderBy: { id: "asc" } });
+      const clubId = getClubIdOrNull(req);
+
+      const items = await prisma.position.findMany({
+        where: clubId ? { clubId } : undefined,
+        orderBy: { id: "asc" },
+      });
+
       return success(res, items);
     } catch (err) {
       next(err);
@@ -46,27 +45,7 @@ router.get(
 );
 
 /**
- * @openapi
- * /positions:
- *   post:
- *     tags: [Positions]
- *     summary: Create position (Admin)
- *     security: [{ bearerAuth: [] }]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [name]
- *             properties:
- *               name:
- *                 type: string
- *                 example: "GK"
- *     responses:
- *       201: { description: Created }
- *       400: { description: Validation error }
- *       409: { description: Duplicate }
+ * CREATE POSITION (Admin)
  */
 router.post(
   "/",
@@ -75,10 +54,14 @@ router.post(
   validate(schemas.createSchema),
   async (req, res, next) => {
     try {
+      const clubId = getClubIdOrNull(req);
       const name = req.body.name.trim();
 
       const created = await prisma.position.create({
-        data: { name },
+        data: {
+          name,
+          clubId: clubId ?? null,
+        },
       });
 
       return success(res, created, 201);
@@ -92,32 +75,7 @@ router.post(
 );
 
 /**
- * @openapi
- * /positions/{id}:
- *   put:
- *     tags: [Positions]
- *     summary: Update position (Admin)
- *     security: [{ bearerAuth: [] }]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [name]
- *             properties:
- *               name:
- *                 type: string
- *                 example: "CB"
- *     responses:
- *       200: { description: Updated }
- *       400: { description: Validation error }
- *       404: { description: Not found }
+ * UPDATE POSITION
  */
 router.put(
   "/:id",
@@ -126,11 +84,16 @@ router.put(
   validate(schemas.updateSchema),
   async (req, res, next) => {
     try {
-      const id = req.params.id; // number (z.coerce)
+      const clubId = getClubIdOrNull(req);
+      const id = Number(req.params.id);
       const name = req.body.name.trim();
 
-      const exists = await prisma.position.findUnique({ where: { id } });
-      if (!exists) return error(res, "Position not found", 404);
+      if (clubId) {
+        const exists = await prisma.position.findFirst({
+          where: { id, clubId },
+        });
+        if (!exists) return error(res, "Position not found", 404);
+      }
 
       const updated = await prisma.position.update({
         where: { id },
@@ -148,23 +111,7 @@ router.put(
 );
 
 /**
- * @openapi
- * /positions/{id}:
- *   delete:
- *     tags: [Positions]
- *     summary: Delete position (Admin)
- *     description: Will fail if position is referenced by player positions.
- *     security: [{ bearerAuth: [] }]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *     responses:
- *       200: { description: Deleted }
- *       400: { description: Validation error }
- *       404: { description: Not found }
- *       409: { description: Cannot delete (Referenced) }
+ * DELETE POSITION
  */
 router.delete(
   "/:id",
@@ -173,17 +120,20 @@ router.delete(
   validate(schemas.deleteSchema),
   async (req, res, next) => {
     try {
-      const id = req.params.id; // ✅ number (z.coerce)
+      const clubId = getClubIdOrNull(req);
+      const id = Number(req.params.id);
 
-      const exists = await prisma.position.findUnique({ where: { id } });
-      if (!exists) return error(res, "Position not found", 404);
+      if (clubId) {
+        const exists = await prisma.position.findFirst({
+          where: { id, clubId },
+        });
+        if (!exists) return error(res, "Position not found", 404);
+      }
 
-      // ✅ دع الـ DB (FK RESTRICT) تمنع الحذف لو referenced
       await prisma.position.delete({ where: { id } });
 
       return success(res, { message: "Position deleted" });
     } catch (err) {
-      // ✅ لو referenced -> Prisma P2003
       if (err?.code === "P2003") {
         return error(res, "Cannot delete (position is referenced)", 409);
       }
@@ -193,22 +143,7 @@ router.delete(
 );
 
 /**
- * @openapi
- * /positions/{id}/best-player:
- *   get:
- *     tags: [Positions]
- *     summary: Get best player for a position (Admin/Coach)
- *     security: [{ bearerAuth: [] }]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *         example: 1
- *     responses:
- *       200: { description: OK }
- *       400: { description: Validation error }
- *       404: { description: No players/stats found }
+ * BEST PLAYER BY POSITION
  */
 router.get(
   "/:id/best-player",
@@ -217,7 +152,9 @@ router.get(
   validate(schemas.bestPlayerSchema),
   async (req, res, next) => {
     try {
-      const result = await getBestPlayerByPosition(req.params.id);
+      const clubId = getClubIdOrNull(req);
+
+      const result = await getBestPlayerByPosition(req.params.id, clubId);
 
       if (!result) {
         return error(res, "No players or stats found for this position", 404);

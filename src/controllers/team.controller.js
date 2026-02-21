@@ -1,12 +1,28 @@
-// D:\penta\src\controllers\team.controller.js
+// src/controllers/team.controller.js
 
 const { success, error } = require("../utils/response");
 const teamService = require("../services/team.service");
 
+// helper
+function getClubIdOrNull(req) {
+  const clubId = req.user?.clubId;
+  if (clubId === undefined || clubId === null || clubId === "") return null;
+  const n = Number(clubId);
+  return Number.isFinite(n) ? n : null;
+}
+
 exports.createTeam = async (req, res, next) => {
   try {
     const { name } = req.body;
-    const team = await teamService.createTeam(name);
+    if (!name) return error(res, "name is required", 400);
+
+    const clubId = getClubIdOrNull(req);
+
+    const team = await teamService.createTeam({
+      name,
+      clubId,
+    });
+
     return success(res, team, 201);
   } catch (err) {
     next(err);
@@ -15,7 +31,12 @@ exports.createTeam = async (req, res, next) => {
 
 exports.getAllTeams = async (req, res, next) => {
   try {
-    const teams = await teamService.getAllTeams();
+    const clubId = getClubIdOrNull(req);
+
+    const teams = await teamService.getAllTeams({
+      clubId,
+    });
+
     return success(res, teams);
   } catch (err) {
     next(err);
@@ -28,8 +49,14 @@ exports.assignCoachToTeam = async (req, res, next) => {
 
     if (!userId) return error(res, "userId is required", 400);
 
-    // teamId ممكن يكون null لفك الربط
-    const updated = await teamService.assignCoachToTeam(userId, teamId ?? null);
+    const clubId = getClubIdOrNull(req);
+
+    const updated = await teamService.assignCoachToTeam({
+      userId,
+      teamId: teamId ?? null,
+      clubId,
+    });
+
     return success(res, updated);
   } catch (err) {
     next(err);
